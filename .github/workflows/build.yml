@@ -20,7 +20,7 @@ jobs:
           /usr/libexec/PlistBuddy -c "Add :NSBluetoothAlwaysUsageDescription string 'Zwift Power Overlay needs Bluetooth to connect to your power meter.'" "$APP/Contents/Info.plist" 2>/dev/null || true
 
       - name: Codesign and notarize
-        if: ${{ secrets.APPLE_DEVELOPER_ID != '' }}
+        if: env.DEVELOPER_ID != ''
         env:
           DEVELOPER_ID: ${{ secrets.APPLE_DEVELOPER_ID }}
           APPLE_ID: ${{ secrets.APPLE_ID }}
