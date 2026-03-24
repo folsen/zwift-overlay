@@ -23,7 +23,12 @@ fn main() {
         return;
     }
 
-    embed_windows_icon().expect("failed to embed Windows executable icon");
+    match embed_windows_icon() {
+        Ok(()) => {}
+        Err(e) => {
+            println!("cargo:warning=Skipping Windows icon embedding: {e}");
+        }
+    }
 }
 
 fn embed_windows_icon() -> io::Result<()> {
