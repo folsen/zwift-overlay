@@ -1,0 +1,64 @@
+name: Build
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+jobs:
+  build-macos:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - run: cargo build --release
+      - name: Create .app bundle
+        run: |
+          cargo install cargo-bundle
+          cargo bundle --release
+          APP="target/release/bundle/osx/Zwift Power Overlay.app"
+          /usr/libexec/PlistBuddy -c "Add :NSBluetoothAlwaysUsageDescription string 'Zwift Power Overlay needs Bluetooth to connect to your power meter.'" "$APP/Contents/Info.plist" 2>/dev/null || true
+
+      - name: Codesign and notarize
+        if: secrets.APPLE_DEVELOPER_ID != ''
+        env:
+          DEVELOPER_ID: ${{ secrets.APPLE_DEVELOPER_ID }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          APP_PASSWORD: ${{ secrets.APPLE_APP_PASSWORD }}
+        run: |
+          APP="target/release/bundle/osx/Zwift Power Overlay.app"
+          codesign --force --sign "$DEVELOPER_ID" \
+            --options runtime \
+            --entitlements entitlements.plist \
+            --timestamp \
+            "$APP"
+          ditto -c -k --keepParent "$APP" "Zwift-Power-Overlay-macOS.zip"
+          xcrun notarytool submit "Zwift-Power-Overlay-macOS.zip" \
+            --apple-id "$APPLE_ID" \
+            --team-id "$TEAM_ID" \
+            --password "$APP_PASSWORD" \
+            --wait
+          xcrun stapler staple "$APP"
+          rm "Zwift-Power-Overlay-macOS.zip"
+
+      - name: Zip for distribution
+        run: |
+          cd "target/release/bundle/osx"
+          ditto -c -k --keepParent "Zwift Power Overlay.app" "Zwift-Power-Overlay-macOS.zip"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: macos-app
+          path: target/release/bundle/osx/Zwift-Power-Overlay-macOS.zip
+
+  build-windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - run: cargo build --release
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows-exe
+          path: target/release/zwift_overlay.exe
